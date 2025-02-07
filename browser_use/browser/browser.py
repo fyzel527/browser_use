@@ -71,8 +71,9 @@ class Browser:
 	):
 		logger.debug('Initializing new browser')
 		self.config = config
-		self.playwright: Playwright | None = None
-		self.playwright_browser: PlaywrightBrowser | None = None
+		self.playwright = None
+		self.playwright_browser = None
+		self._closed = False  # 添加标志位控制浏览器关闭
 
 		self.disable_security_args = []
 		if self.config.disable_security:
@@ -218,26 +219,20 @@ class Browser:
 			raise
 
 	async def close(self):
-		"""Close the browser instance"""
-		try:
-			if self.playwright_browser:
-				await self.playwright_browser.close()
-			if self.playwright:
-				await self.playwright.stop()
-		except Exception as e:
-			logger.debug(f'Failed to close browser properly: {e}')
-		finally:
-			self.playwright_browser = None
-			self.playwright = None
+		"""只在明确调用时关闭浏览器"""
+		if not self._closed and (self.playwright_browser or self.playwright):
+			try:
+				if self.playwright_browser:
+					await self.playwright_browser.close()
+				if self.playwright:
+					await self.playwright.stop()
+			except Exception as e:
+				logger.debug(f'Failed to close browser properly: {e}')
+			finally:
+				self._closed = True
+				self.playwright_browser = None
+				self.playwright = None
 
 	def __del__(self):
-		"""Async cleanup when object is destroyed"""
-		try:
-			if self.playwright_browser or self.playwright:
-				loop = asyncio.get_running_loop()
-				if loop.is_running():
-					loop.create_task(self.close())
-				else:
-					asyncio.run(self.close())
-		except Exception as e:
-			logger.debug(f'Failed to cleanup browser in destructor: {e}')
+		"""移除自动清理,保持浏览器实例"""
+		pass

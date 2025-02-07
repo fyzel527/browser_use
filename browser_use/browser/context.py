@@ -1137,3 +1137,30 @@ class BrowserContext:
 			screenshot=None,
 			tabs=[],
 		)
+
+	async def execute_command(self, command: str) -> None:
+		"""在当前页面执行新命令"""
+		try:
+			page = await self.get_current_page()
+			
+			# 等待页面加载完成
+			await self._wait_for_page_and_frames_load()
+			
+			# 执行命令
+			await page.evaluate(f"(() => {{ {command} }})()")
+			
+			# 等待命令执行完成
+			await page.wait_for_load_state("networkidle")
+			
+		except Exception as e:
+			raise Exception(f'Failed to execute command: {str(e)}')
+
+	async def input_and_execute(self, command: str) -> None:
+		"""输入并执行新命令"""
+		session = await self.get_session()
+		if session and not session.context.is_closed():
+			await self.execute_command(command)
+		else:
+			# 如果会话关闭,重新初始化
+			await self._initialize_session()
+			await self.execute_command(command)
